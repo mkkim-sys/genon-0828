@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>신규입사자 좌석 배치도 (글자 크기 최적화)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&amp;family=Roboto:wght@400;700&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #3b82f6;
+            --primary-hover: #2563eb;
+            --highlight-color: #f59e0b;
+            --bg-color: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --success-color: #10b981;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #f8fafc; min-height: 100vh; font-family: 'Noto Sans KR', sans-serif;
+            display: flex; justify-content: center;
+            padding: clamp(10px, 3vw, 40px);
+        }
+
+        .slide-container {
+            width: 100%; max-width: 1280px; background-color: var(--bg-color);
+            position: relative; box-shadow: 0 20px 50px rgba(0,0,0,0.1);
+            display: flex; flex-direction: column; border-radius: 12px;
+        }
+
+        .view { position: relative; width: 100%; padding: clamp(20px,4vw,50px) clamp(16px,5vw,80px); display: flex; flex-direction: column; background: white; z-index: 10; }
+        .view.hidden { display: none !important; }
+
+        header { margin-bottom: clamp(16px,3vw,28px); border-bottom: 2px solid var(--border-color); padding-bottom: clamp(12px,2vw,18px); display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; min-height: 60px; }
+        .title-group h1 { font-size: clamp(22px, 4vw, 38px); color: var(--text-main); font-weight: 700; }
+        .title-group p { font-size: clamp(13px, 2vw, 16px); color: var(--text-muted); margin-top: 4px; }
+
+        .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .btn { padding: clamp(8px,1.5vw,10px) clamp(12px,2vw,18px); border-radius: 8px; font-size: clamp(12px,1.5vw,14px); font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 8px; border: none; transition: all 0.2s ease; font-family: 'Noto Sans KR', sans-serif; white-space: nowrap; }
+        .btn-download { background-color: var(--success-color); color: white; }
+        .btn-download:hover { background-color: #059669; }
+        .btn-edit { background-color: #f1f5f9; color: var(--text-main); border: 1px solid var(--border-color); }
+        .btn-edit:hover { background-color: #e2e8f0; }
+        .btn-edit.active { background-color: var(--primary-color); color: white; border-color: var(--primary-color); }
+        .btn-back { background-color: var(--text-main); color: white; }
+
+        .edit-badge {
+            display: none;
+            position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+            background: #fef3c7; color: #92400e; border: 1px solid #fde68a;
+            font-size: 12px; font-weight: 600; padding: 4px 14px; border-radius: 20px;
+            z-index: 100;
+        }
+        .edit-badge.visible { display: block; }
+
+        .chart-area { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: clamp(16px,3vw,28px); padding: clamp(12px,2vw,0) 0; }
+        .table-rect { width: clamp(240px, 55vw, 700px); height: clamp(80px, 15vw, 180px); background: #f1f5f9; border: 3px solid var(--border-color); border-radius: 15px; box-shadow: inset 0 4px 10px rgba(0,0,0,0.03); }
+        .seat-row { display: flex; flex-wrap: wrap; justify-content: center; gap: clamp(14px, 4vw, 48px); }
+
+        .seat-circle {
+            width: clamp(60px, 12vw, 100px); height: clamp(60px, 12vw, 100px); background: var(--primary-color); border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; color: white;
+            font-size: clamp(10px, 1.6vw, 15px); font-weight: 600; cursor: pointer; transition: all 0.3s ease;
+            box-shadow: 0 8px 15px -3px rgba(59, 130, 246, 0.3); border: clamp(2px, 0.5vw, 4px) solid white;
+            overflow: hidden; user-select: none;
+        }
+        .seat-circle:hover { transform: scale(1.08); box-shadow: 0 12px 20px -3px rgba(59, 130, 246, 0.4); }
+        .seat-circle.empty { background: var(--primary-color); box-shadow: 0 8px 15px -3px rgba(59, 130, 246, 0.3); cursor: pointer; }
+
+        .seat-circle.empty:hover { transform: scale(1.08); box-shadow: 0 12px 20px -3px rgba(203,213,225,0.6); }
+        .seat-circle.highlight { background: var(--highlight-color); box-shadow: 0 8px 15px -3px rgba(245, 158, 11, 0.3); }
+
+        .seat-number {
+            width: 100%; text-align: center;
+            white-space: pre-wrap; word-break: keep-all;
+            line-height: 1.25; padding: clamp(2px,1vw,5px);
+            pointer-events: none;
+        }
+        /* 편집모드일 때만 contenteditable 활성화 */
+        body.edit-mode .seat-number { pointer-events: auto; cursor: text; }
+        body.edit-mode .seat-circle:hover { transform: none; }
+
+        /* 모달 */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.45); z-index: 200;
+            justify-content: center; align-items: center;
+            padding: 16px;
+        }
+        .modal-overlay.visible { display: flex; }
+        .modal {
+            background: white; border-radius: 16px; padding: clamp(20px,4vw,36px);
+            width: min(380px, 100%); box-shadow: 0 25px 50px rgba(0,0,0,0.2);
+            display: flex; flex-direction: column; gap: 20px;
+        }
+        .modal h3 { font-size: 18px; font-weight: 700; color: var(--text-main); }
+        .modal label { font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; display: block; }
+        .modal input, .modal textarea {
+            width: 100%; border: 1px solid var(--border-color); border-radius: 8px;
+            padding: 10px 12px; font-size: 15px; font-family: 'Noto Sans KR', sans-serif;
+            color: var(--text-main); outline: none; transition: border 0.2s;
+        }
+        .modal input:focus, .modal textarea:focus { border-color: var(--primary-color); }
+        .modal textarea { resize: vertical; min-height: 80px; }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+        .btn-cancel { background: #f1f5f9; color: var(--text-main); border: 1px solid var(--border-color); }
+        .btn-save { background: var(--primary-color); color: white; }
+        .btn-save:hover { background: var(--primary-hover); }
+
+        /* 상세 페이지 */
+        .detail-content { flex-grow: 1; display: grid; grid-template-columns: 1fr 2fr; gap: clamp(20px,4vw,60px); align-items: start; padding-top: 20px; }
+        .detail-visual { background: #f8fafc; border-radius: 20px; height: clamp(200px, 30vw, 340px); display: flex; justify-content: center; align-items: center; border: 1px solid var(--border-color); }
+        .large-seat {
+            width: clamp(140px, 26vw, 210px); height: clamp(140px, 26vw, 210px); background: var(--primary-color); border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; color: white;
+            font-size: clamp(15px, 2.2vw, 22px); font-weight: 700; padding: clamp(12px,2vw,20px); text-align: center;
+            box-shadow: 0 20px 30px rgba(59, 130, 246, 0.2);
+            white-space: pre-wrap; word-break: keep-all; line-height: 1.3;
+        }
+        .large-seat.highlight { background: var(--highlight-color); box-shadow: 0 20px 30px rgba(245, 158, 11, 0.2); }
+        .large-seat.highlight-blue { background: #2563eb; box-shadow: 0 20px 30px rgba(37, 99, 235, 0.35); border: 4px solid #93c5fd; }
+
+        .info-container { display: flex; flex-direction: column; gap: clamp(20px,3vw,36px); }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(10px,2vw,16px); }
+        .info-box { background: #f1f5f9; padding: clamp(14px,2vw,22px); border-radius: 12px; }
+        .info-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; font-weight: 700; outline: none; }
+        .info-value { font-size: clamp(15px,1.8vw,18px); font-weight: 600; color: var(--text-main); outline: none; }
+        .editable-area {
+            font-size: 15px; color: var(--text-main); min-height: 200px; outline: none;
+            line-height: 1.7; border: 1px dashed var(--border-color); border-radius: 12px;
+            padding: 20px; background: #ffffff; white-space: pre-wrap;
+        }
+        /* 상세페이지는 편집모드와 무관하게 항상 편집 가능 */
+        #detail-view .info-label,
+        #detail-view .info-value,
+        #detail-view .editable-area { cursor: text; }
+
+        @media (max-width: 640px) {
+            .detail-content { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 480px) {
+            .info-grid { grid-template-columns: 1fr; }
+            header { flex-direction: column; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body class="">
+
+    <!-- 모달 -->
+    <div class="modal-overlay" id="modal-overlay">
+        <div class="modal">
+            <h3>좌석 정보 편집</h3>
+            <div>
+                <label>이름 / 표시</label>
+                <input type="text" id="modal-display" placeholder="예) 홍길동 프로">
+            </div>
+            <div>
+                <label>소속</label>
+                <input type="text" id="modal-role" placeholder="예) Agent개발그룹">
+            </div>
+            <div>
+                <label>상세 내용</label>
+                <textarea id="modal-desc" rows="4" placeholder="경력, 온보딩 현황 등"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeModal()">취소</button>
+                <button class="btn btn-save" onclick="saveModal()">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-container">
+        <!-- VIEW 1: MAIN SEATING CHART -->
+        <div id="main-view" class="view">
+            <div class="edit-badge" id="edit-badge">✏️ 편집 모드</div>
+            <header>
+                <div class="title-group">
+                    <h1 id="main-title">신규입사자 좌석 배치도</h1>
+                    <p id="main-subtitle"></p>
+                </div>
+                <div class="controls">
+                    <button class="btn btn-edit" id="edit-btn" onclick="toggleEditMode()">
+                        <i class="fa-solid fa-pen"></i> 편집
+                    </button>
+                    <button class="btn btn-download" onclick="downloadSlide()">
+                        <i class="fa-solid fa-file-arrow-down"></i> 다운로드
+                    </button>
+                </div>
+            </header>
+            <div class="chart-area">
+                <div class="seat-row" id="top-row"><div>
+                    <div class="seat-circle" id="seat-1" onclick="handleSeatClick('1')">
+                        <span class="seat-number" id="seat-display-1">여형구   (SW)</span>
+                    </div>
+                </div><div>
+                    <div class="seat-circle" id="seat-2" onclick="handleSeatClick('2')">
+                        <span class="seat-number" id="seat-display-2">최연규  (Core 2파트)</span>
+                    </div>
+                </div><div>
+                    <div class="seat-circle" id="seat-3" onclick="handleSeatClick('3')">
+                        <span class="seat-number" id="seat-display-3">조윤행  (Core 2파트)</span>
+                    </div>
+                </div><div>
+                    <div class="seat-circle empty" id="seat-4" onclick="handleSeatClick('4')">
+                        <span class="seat-number" id="seat-display-4"></span>
+                    </div>
+                </div></div>
+                <div class="table-rect"></div>
+                <div class="seat-row" id="bottom-row"><div>
+                    <div class="seat-circle" id="seat-5" onclick="handleSeatClick('5')">
+                        <span class="seat-number" id="seat-display-5">대표님</span>
+                    </div>
+                </div><div>
+                    <div class="seat-circle empty" id="seat-6" onclick="handleSeatClick('6')">
+                        <span class="seat-number" id="seat-display-6"></span>
+                    </div>
+                </div><div>
+                    <div class="seat-circle" id="seat-7" onclick="handleSeatClick('7')">
+                        <span class="seat-number" id="seat-display-7">이성룡 (프로덕트)</span>
+                    </div>
+                </div><div>
+                    <div class="seat-circle" id="seat-8" onclick="handleSeatClick('8')">
+                        <span class="seat-number" id="seat-display-8">곽승연 (PMO파트)</span>
+                    </div>
+                </div></div>
+            </div>
+        </div>
+
+        <!-- VIEW 2: DETAIL PAGE -->
+        <div id="detail-view" class="view hidden">
+            <header style="border-bottom: none; margin-bottom: 0;">
+                <div></div>
+                <button class="btn btn-back" onclick="goBack()">
+                    <i class="fa-solid fa-arrow-left"></i> 배치도로 돌아가기
+                </button>
+            </header>
+            <div class="detail-content">
+                <div class="detail-visual">
+                    <div class="large-seat" id="detail-seat-id">이찬녕 프로  (AI Eng.)</div>
+                </div>
+                <div class="info-container">
+                    <div class="info-grid">
+                        <div class="info-box">
+                            <div class="info-label">이름</div>
+                            <div class="info-value" id="detail-name" contenteditable="true">이찬녕 프로  (AI Eng.)</div>
+                        </div>
+                        <div class="info-box">
+                            <div class="info-label">소속</div>
+                            <div class="info-value" id="detail-role" contenteditable="true">AI Core 1파트</div>
+                        </div>
+                    </div>
+                    <div id="detail-desc" class="editable-area" contenteditable="true">천재교육 2023.12 ~ 2026.05<br><br>단국대학교 응용통계학 2023 졸업</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script id="data-script">
+        let seatData = {
+    "config": {
+        "title": "신규입사자 좌석 배치도",
+        "subtitle": ""
+    },
+    "seats": {
+        "1": {
+            "display": "여형구   (SW)",
+            "name": "여형구   (SW)",
+            "role": "솔루션개발파트",
+            "desc": "2024.04  – 26.08 주식회사에스에스티랩\n\n\n2019 ~ 2022 강원대학교(춘천) 학사 / 화학공학"
+        },
+        "2": {
+            "display": "최연규  (Core 2파트)",
+            "name": "최연규  (Core 2파트)",
+            "role": "AI Core 2파트",
+            "desc": "2020.04 – 2026.07  (주)비알프레임\n\n\n석사 2016.03 – 2018.02 단국대학교 일반대학원 | 데이터사이언스학과 \n\n학사 2010.03 – 2016.02 강원대학교 | 수학과"
+        },
+        "3": {
+            "display": "조윤행  (Core 2파트)",
+            "name": "조윤행  (Core 2파트)",
+            "role": "AI Core 2파트",
+            "desc": "2025.02 - 2026.04 주식회사휴머스온\n2024.05 - 2024.08  이지에이아이\n2022.07 - 2023.09  코드스테이츠\n\n2015.03 - 2021.02 졸업 연세대학교 기계공학과"
+        },
+        "4": {
+            "display": "",
+            "name": "",
+            "role": "",
+            "desc": "엠투지디지털 2024.10 ~ 2026.05\n퓨처누리 2023.06 ~ 2024.10 \n\n동아대 전자공학과 2022.02 졸업"
+        },
+        "5": {
+            "display": "대표님",
+            "name": "대표님",
+            "role": "",
+            "desc": ""
+        },
+        "6": {
+            "display": "",
+            "name": "",
+            "role": "",
+            "desc": "신세계아이앤씨 2022.11 ~ 2026.05\n주식회사 페이얍 2022.05 ~ 2022.11\n엔디에스 2021.01 ~ 2022.05\n영풍문고홀딩스 2018.01 ~ 2020.08\n\n\n동국대 컴퓨터공학 학사 2018년"
+        },
+        "7": {
+            "display": "이성룡 (프로덕트)",
+            "name": "이성룡 (프로덕트)",
+            "role": "프로덕트 운영파트",
+            "desc": "2025.04 - 2025.10  스탠스 \n2024.03 - 2024.10  피피비스튜디오스\n2023.03 - 2024.03   위버케어\n2022.03 - 2023.02   퍼즐에이아이 \n\n\n2020.03 - 2022.03  동양미래대학교 정보통신공학과"
+        },
+        "8": {
+            "display": "곽승연 (PMO파트)",
+            "name": "곽승연 (PMO파트)",
+            "role": "PMO파트",
+            "desc": "2021.06 – 2025.08  NICE Data & Research (나이스디앤알)\n\n2021 졸업 한남대 통계학과"
+        }
+    }
+};
+
+        let currentSeatId = "1";
+        let isEditMode = false;
+        let modalTargetId = null;
+
+        function initChart() {
+            const topRow = document.getElementById('top-row');
+            const bottomRow = document.getElementById('bottom-row');
+            topRow.innerHTML = '';
+            bottomRow.innerHTML = '';
+
+            document.getElementById('main-title').innerText = seatData.config.title;
+            document.getElementById('main-subtitle').innerText = seatData.config.subtitle;
+
+            for (let i = 1; i <= 8; i++) {
+                const seatInfo = seatData.seats[i.toString()];
+                const isEmpty = !seatInfo.display.trim();
+                const container = document.createElement('div');
+                container.innerHTML = `
+                    <div class="seat-circle ${isEmpty ? 'empty' : ''}" id="seat-${i}" onclick="handleSeatClick('${i}')">
+                        <span class="seat-number" id="seat-display-${i}">${isEmpty ? '' : seatInfo.display}</span>
+                    </div>
+                `;
+                if (i <= 4) topRow.appendChild(container);
+                else bottomRow.appendChild(container);
+            }
+        }
+
+        function toggleEditMode() {
+            isEditMode = !isEditMode;
+            document.body.classList.toggle('edit-mode', isEditMode);
+            document.getElementById('edit-btn').classList.toggle('active', isEditMode);
+            document.getElementById('edit-badge').classList.toggle('visible', isEditMode);
+        }
+
+        function handleSeatClick(id) {
+            const seatInfo = seatData.seats[id];
+            const isEmpty = !seatInfo.display.trim();
+            if (isEditMode || isEmpty) {
+                // 편집모드이거나 빈 자리면 팝업으로 편집
+                modalTargetId = id;
+                document.getElementById('modal-display').value = seatInfo.display || '';
+                document.getElementById('modal-role').value = seatInfo.role;
+                document.getElementById('modal-desc').value = seatInfo.desc;
+                document.getElementById('modal-overlay').classList.add('visible');
+            } else {
+                // 뷰어모드 + 내용 있는 자리: 상세 페이지로 이동
+                goToDetail(id);
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('modal-overlay').classList.remove('visible');
+            modalTargetId = null;
+        }
+
+        function saveModal() {
+            if (!modalTargetId) return;
+            const display = document.getElementById('modal-display').value.trim();
+            const role = document.getElementById('modal-role').value.trim();
+            const desc = document.getElementById('modal-desc').value.trim();
+            seatData.seats[modalTargetId].display = display;
+            seatData.seats[modalTargetId].name = display;
+            seatData.seats[modalTargetId].role = role;
+            seatData.seats[modalTargetId].desc = desc;
+
+            const span = document.getElementById(`seat-display-${modalTargetId}`);
+            if (span) span.innerText = display;
+            const circle = document.getElementById(`seat-${modalTargetId}`);
+            if (circle) {
+                if (display) circle.classList.remove('empty');
+                else circle.classList.add('empty');
+            }
+            closeModal();
+        }
+
+        function goToDetail(id) {
+            currentSeatId = id;
+            const data = seatData.seats[id];
+            const detailCircle = document.getElementById('detail-seat-id');
+            detailCircle.innerText = data.display;
+            detailCircle.className = 'large-seat';
+
+            document.getElementById('detail-name').innerText = data.name;
+            document.getElementById('detail-role').innerText = data.role;
+            document.getElementById('detail-desc').innerText = data.desc;
+
+            document.getElementById('main-view').classList.add('hidden');
+            document.getElementById('detail-view').classList.remove('hidden');
+        }
+
+        function saveCurrentDetail() {
+            if (document.getElementById('detail-view').classList.contains('hidden')) return;
+            seatData.seats[currentSeatId].name = document.getElementById('detail-name').innerText;
+            seatData.seats[currentSeatId].role = document.getElementById('detail-role').innerText;
+            seatData.seats[currentSeatId].desc = document.getElementById('detail-desc').innerText;
+        }
+
+        function goBack() {
+            saveCurrentDetail();
+            document.getElementById('detail-view').classList.add('hidden');
+            document.getElementById('main-view').classList.remove('hidden');
+            initChart();
+        }
+
+        function downloadSlide() {
+            saveCurrentDetail();
+            seatData.config.title = document.getElementById('main-title').innerText;
+            seatData.config.subtitle = document.getElementById('main-subtitle').innerText;
+
+            let htmlContent = document.documentElement.outerHTML;
+            const dataRegex = /let seatData = \{[\s\S]*?\};/;
+            const newDataString = `let seatData = ${JSON.stringify(seatData, null, 4)};`;
+            htmlContent = htmlContent.replace(dataRegex, newDataString);
+
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '신규입사자_좌석배치도_최종.html';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // ESC로 모달 닫기
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+        window.onload = initChart;
+    </script>
+
+</body></html>
